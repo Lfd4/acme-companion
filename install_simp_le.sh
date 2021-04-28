@@ -21,6 +21,7 @@ for pkg in pip setuptools wheel
 do
   pip3 install -U "${pkg?}"
 done
+pip3 install "cryptography<3.4"
 pip3 install .
 
 # Make house cleaning
