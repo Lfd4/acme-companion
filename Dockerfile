@@ -1,21 +1,19 @@
-FROM golang:1.15-alpine AS go-builder
+FROM golang:1.17.5-alpine AS go-builder
 
-ENV DOCKER_GEN_VERSION=0.7.4
-
-# Install build dependencies for docker-gen
-RUN apk add --update \
-        curl \
-        gcc \
-        git \
-        make \
-        musl-dev
+ENV DOCKER_GEN_VERSION=0.8.2
 
 # Build docker-gen
-RUN go get github.com/jwilder/docker-gen \
-    && cd /go/src/github.com/jwilder/docker-gen \
-    && git checkout $DOCKER_GEN_VERSION \
-    && make get-deps \
-    && make all
+RUN apk add --no-cache --virtual .build-deps git \
+    && git clone https://github.com/nginx-proxy/docker-gen \
+    && cd /go/docker-gen \
+    && git -c advice.detachedHead=false checkout $DOCKER_GEN_VERSION \
+    && go mod download \
+    && CGO_ENABLED=0 go build -ldflags "-X main.buildVersion=${VERSION}" -o docker-gen ./cmd/docker-gen \
+    && go clean -cache \
+    && mv docker-gen /usr/local/bin/ \
+    && cd - \
+    && rm -rf /go/docker-gen \
+    && apk del .build-deps
 
 FROM alpine:3.11
 
@@ -35,7 +33,7 @@ RUN apk add --update \
     && rm /var/cache/apk/*
 
 # Install docker-gen from build stage
-COPY --from=go-builder /go/src/github.com/jwilder/docker-gen/docker-gen /usr/local/bin/
+COPY --from=go-builder /usr/local/bin/docker-gen /usr/local/bin/
 
 # Install simp_le
 COPY /install_simp_le.sh /app/install_simp_le.sh
